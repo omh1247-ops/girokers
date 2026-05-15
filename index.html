@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GIROKERS</title>
+  <style>
+    :root {
+      --bg: #fff;
+      --panel: #fff;
+      --text: #000;
+      --muted: #666;
+      --accent: #000;
+      --shadow: 0 20px 60px rgba(0,0,0,0.08);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--accent); }
+    body { display: flex; height: 100vh; overflow: hidden; }
+    .app-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); width: 100%; height: 100%; }
+    .sidebar { background: var(--panel); color: var(--text); padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; }
+    .brand h1 { margin: 0; font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
+    .nav-list { list-style: none; margin: 0; padding: 0; display: block; flex: 1; }
+    .nav-link { color: var(--text); text-decoration: none; font-size: 0.88rem; line-height: 1.1; transition: color 180ms ease; display: inline-flex; }
+    .nav-link:hover { text-decoration: underline; }
+    .nav-link.active { font-weight: 700; }
+    .add-session-btn { border: 1px solid #ddd; background: transparent; color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; width: 100%; text-align: left; margin-top: auto; }
+    .add-session-btn:hover { background: #f7f7f7; border-color: #000; }
+    .hidden { display: none; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 10000;
+      padding: 16px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      width: min(100%, 320px);
+      background: #fff;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+    }
+    .modal-box h2 {
+      margin: 0 0 18px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #111;
+    }
+    .modal-box form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-box input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      font-size: 0.95rem;
+      outline: none;
+      color: #111;
+    }
+    .modal-box .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 6px;
+    }
+    .modal-box button {
+      min-width: 96px;
+      padding: 11px 14px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+    .modal-box .cancel-btn {
+      background: #f2f2f2;
+      color: #333;
+    }
+    .modal-box .submit-btn {
+      background: #000;
+      color: #fff;
+    }
+    .gallery-wrap { background: var(--bg); padding: 24px 24px 32px; overflow: auto; position: relative; }
+    .drag-overlay { position: absolute; inset: 24px; background: rgba(240, 240, 240, 0.95); border: 3px dashed #999; border-radius: 20px; display: none; align-items: center; justify-content: center; z-index: 100; pointer-events: none; }
+    .drag-overlay.active { display: flex; }
+    .drag-message { color: #333; font-size: 1.5rem; font-weight: 700; text-align: center; padding: 40px; }
+    .gallery { column-count: 5; column-gap: 8px; width: auto; }
+    .photo-count { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; margin-top: 20px; }
+    .photo-card {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+      margin: 0 0 20px;
+      break-inside: avoid;
+      cursor: pointer;
+      overflow: visible;
+      border-radius: 8px;
+      background: none;
+    }
+    .photo-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+      transition: transform 0.4s ease;
+      object-fit: cover;
+      margin-bottom: 12px;
+    }
+    .vote-chip {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      padding: 7px 18px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border: none;
+      cursor: pointer;
+      z-index: 2;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: background 0.2s;
+      width: auto;
+      margin: 0;
+    }
+    .vote-chip.voted {
+      background: #e53935;
+      color: #fff;
+    }
+    .vote-chip .heart {
+      font-size: 1.1em;
+    }
+    .heart-burst { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.95); font-size: 2.2rem; opacity: 0; transition: opacity 180ms ease; pointer-events: none; z-index: 3; }
+    .photo-card.voted .heart-burst { opacity: 1; }
+    @keyframes heartPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    .photo-card.vote-animation .heart-burst { animation: heartPop 0.4s ease; }
+    @keyframes heartBreak { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2) rotate(10deg); opacity: 0.5; } 100% { transform: scale(0.5) rotate(-10deg); opacity: 0; } }
+    .photo-card.unvote-animation .heart-burst { animation: heartBreak 0.4s ease; }
+    @keyframes countPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+    .vote-chip.pulse { animation: countPulse 0.3s ease; }
+    @media (max-width: 1280px) { .gallery { column-count: 4; } }
+    @media (max-width: 1024px) { .gallery { column-count: 3; } }
+    @media (max-width: 768px) { .app-shell { grid-template-columns: 1fr; } .sidebar { position: relative; height: auto; width: 100%; padding: 20px 16px 16px; order: -1; } .gallery-wrap { padding: 16px 12px 24px; } .gallery { column-count: 2; } }
+    @media (max-width: 560px) { .gallery { column-count: 1; } .nav-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; } .nav-link { white-space: nowrap; } }
+    /* 모달 스타일 */
+    #photoModal { display: none; position: fixed; z-index: 9999; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.9); transition: opacity 0.2s; }
+    #photoModal.active { display: flex; opacity: 1; }
+    #photoModal .modal-backdrop { position: absolute; inset: 0; background: transparent; cursor: pointer; }
+    #photoModal .modal-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 90vw; max-height: 90vh; background: none; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); padding: 0; }
+    #photoModal .modal-img { max-width: 80vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.18); background: #222; object-fit: contain; margin: 0; display: block; }
+    #photoModal .modal-close { position: absolute; top: 18px; right: 18px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 2rem; cursor: pointer; z-index: 3; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    #photoModal .modal-close:hover { background: #e53935; }
+    /* --- 출사 관리/사진 다중 삭제 UI 스타일 추가 --- */
+    .sidebar .session-actions {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 6px;
+      position: relative;
+    }
+    .session-menu-btn {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.1em;
+      padding: 2px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .session-menu-btn:hover {
+      background: #f2f2f2;
+      color: #000;
+    }
+    .session-menu-popup {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 22px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      z-index: 20;
+      min-width: 90px;
+      padding: 4px 0;
+    }
+    .session-item.open .session-menu-popup {
+      display: block;
+    }
+    .session-menu-popup button {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: #222;
+      font-size: 0.92em;
+      padding: 7px 16px;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 0;
+    }
+    .session-menu-popup button:hover {
+      background: #f7f7f7;
+      color: #e53935;
+    }
+    .session-edit-form {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .session-edit-form input {
+      width: 70px;
+      font-size: 0.9em;
+      padding: 5px 7px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .session-edit-form button {
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.9em;
+      cursor: pointer;
+    }
+    .session-edit-form .cancel {
+      background: #eee;
+      color: #333;
+    }
+    /* --- 사진 다중 선택 --- */
+    .photo-card .select-checkbox {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      z-index: 11;
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border: 2px solid #111;
+      border-radius: 6px;
+      appearance: none;
+      cursor: pointer;
+      display: none;
+    }
+    .photo-card.select-mode .select-checkbox {
+      display: block;
+    }
+    .photo-card .select-checkbox:checked {
+      background: #1976d2;
+      border-color: #1976d2;
+    }
+    .photo-card .select-checkbox:checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .photo-card.selected {
+      box-shadow: 0 0 0 3px #1976d2;
+    }
+    .photo-card.selected::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(25, 118, 210, 0.13);
+      pointer-events: none;
+      border-radius: 8px;
+    }
+    .vote-chip:disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .gallery-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .gallery-menu-wrapper {
+      position: relative;
+    }
+    .gallery-menu-btn {
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      background: #fff;
+      color: #000;
+      font-size: 1rem;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .gallery-menu-popup {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+      min-width: 170px;
+      padding: 8px 0;
+      z-index: 20;
+    }
+    .gallery-menu-wrapper.open .gallery-menu-popup {
+      display: block;
+    }
+    .gallery-menu-popup button {
+      width: 100%;
+      background: none;
+      border: none;
+      color: #222;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .gallery-menu-popup button:hover {
+      background: #f7f7f7;
+      color: #000;
+    }
+    .gallery-menu-popup .delete-action {
+      color: #e53935;
+    }
+    .gallery-header .photo-count {
+      color: #666;
+      font-size: 0.9rem;
+    }
+    .photo-card .select-checkbox {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      z-index: 11;
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border: 2px solid #333;
+      border-radius: 5px;
+      appearance: none;
+      cursor: pointer;
+      display: none;
+      position: relative;
+    }
+    .photo-card.select-mode .select-checkbox {
+      display: block;
+    }
+    .photo-card .select-checkbox:checked {
+      background: #1976d2;
+      border-color: #1976d2;
+    }
+    .photo-card .select-checkbox:checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><h1>GIROKERS</h1></div>
+      <ul class="nav-list" id="navList"></ul>
+      <button class="add-session-btn" id="addSessionBtn" type="button">+ 출사 추가</button>
+    </aside>
+    <main class="gallery-wrap" id="galleryWrap">
+      <div class="drag-overlay" id="dragOverlay"><div class="drag-message">📸 여기에 사진을 드롭하세요</div></div>
+      <div class="gallery-header">
+        <div class="photo-count" id="photoCount">사진 0개</div>
+        <div class="gallery-menu-wrapper" id="galleryMenuWrapper">
+          <button class="gallery-menu-btn" id="galleryMenuBtn" type="button">⋯</button>
+          <div class="gallery-menu-popup" id="galleryMenuPopup">
+            <button id="toggleSelectBtn" type="button">사진 선택</button>
+            <button id="deleteSelectedBtn" class="delete-action" type="button" disabled>선택 삭제 (0개)</button>
+          </div>
+        </div>
+      </div>
+      <div class="gallery" id="gallery"></div>
+    </main>
+  </div>
+  <div class="modal-overlay hidden" id="sessionModal">
+    <div class="modal-box">
+      <h2 id="sessionModalTitle">출사 추가</h2>
+      <form id="sessionModalForm">
+        <input id="modalSessionLocation" type="text" placeholder="장소" required />
+        <input id="modalSessionDate" type="text" placeholder="날짜 (MMDD)" required />
+        <div class="modal-actions">
+          <button type="button" class="cancel-btn" id="cancelSessionModal">취소</button>
+          <button type="submit" class="submit-btn" id="saveSessionBtn">추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    // ===== 변수 선언 =====
+    const ADMIN_PASSWORD = 'audgns12';
+    const storedSessions = JSON.parse(localStorage.getItem('photoSessions') || 'null');
+    const sessions = Array.isArray(storedSessions) ? storedSessions : [
+      {
+        id: 'session-1',
+        number: 1,
+        location: '을지로',
+        date: '0510',
+        photos: [
+          {
+            id: 'session-1-photo-1',
+            title: '궁궐의 새벽',
+            author: '지윤',
+            imageUrl: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80',
+            votes: 14,
+          },
+          {
+            id: 'session-1-photo-2',
+            title: '전각의 그림자',
+            author: '태민',
+            imageUrl: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80',
+            votes: 22,
+          },
+        ],
+      },
+    ];
+    const gallery = document.getElementById('gallery');
+    const galleryWrap = document.getElementById('galleryWrap');
+    const dragOverlay = document.getElementById('dragOverlay');
+    const photoCount = document.getElementById('photoCount');
+    const navList = document.getElementById('navList');
+    const addSessionBtn = document.getElementById('addSessionBtn');
+    const sessionModal = document.getElementById('sessionModal');
+    const sessionModalTitle = document.getElementById('sessionModalTitle');
+    const sessionModalForm = document.getElementById('sessionModalForm');
+    const modalSessionLocationInput = document.getElementById('modalSessionLocation');
+    const modalSessionDateInput = document.getElementById('modalSessionDate');
+    const cancelSessionModal = document.getElementById('cancelSessionModal');
+    const saveSessionBtn = document.getElementById('saveSessionBtn');
+    const galleryMenuWrapper = document.getElementById('galleryMenuWrapper');
+    const galleryMenuBtn = document.getElementById('galleryMenuBtn');
+    const galleryMenuPopup = document.getElementById('galleryMenuPopup');
+    const toggleSelectBtn = document.getElementById('toggleSelectBtn');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const storedVotes = JSON.parse(localStorage.getItem('photoVotes') || '{}');
+    const storedIds = JSON.parse(localStorage.getItem('photoVotedIds') || '[]');
+    let dragCounter = 0;
+    const state = {
+      filter: sessions[0]?.id || 'session-1',
+      votedIds: Array.isArray(storedIds) ? storedIds : [],
+      voteCounts: storedVotes && typeof storedVotes === 'object' ? storedVotes : {},
+      selectMode: false,
+      selectedPhotos: [],
+      editSessionId: null,
+      activeMenuSession: null,
+      galleryMenuOpen: false,
+    };
+
+    // ===== 저장 함수 =====
+    function saveState() {
+      localStorage.setItem('photoVotes', JSON.stringify(state.voteCounts));
+      localStorage.setItem('photoVotedIds', JSON.stringify(state.votedIds));
+    }
+    function saveSessions() {
+      localStorage.setItem('photoSessions', JSON.stringify(sessions));
+    }
+
+    // ===== 데이터 접근 함수 =====
+    function getPhotos() {
+      const session = sessions.find((item) => item.id === state.filter);
+      return session ? session.photos : [];
+    }
+    function getCount(photo) {
+      return state.voteCounts[photo.id] != null ? state.voteCounts[photo.id] : photo.votes;
+    }
+
+    // ===== 네비게이션 렌더링 =====
+    function renderNav() {
+      navList.innerHTML = sessions
+        .map(
+          (session) => `
+          <li class="session-item${state.activeMenuSession === session.id ? ' open' : ''}" data-id="${session.id}">
+            <a class="nav-link${session.id === state.filter ? ' active' : ''}" href="#" data-id="${session.id}">${session.number}회 - ${session.location} ${session.date}</a>
+            <span class="session-actions">
+              <button class="session-menu-btn" type="button" data-id="${session.id}" aria-label="출사 메뉴">⋯</button>
+              <div class="session-menu-popup">
+                <button class="edit-session-btn" type="button" data-id="${session.id}">수정</button>
+                <button class="delete-session-btn" type="button" data-id="${session.id}">삭제</button>
+              </div>
+            </span>
+          </li>`
+        )
+        .join('');
+      navList.querySelectorAll('.nav-link').forEach((link) => {
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          state.filter = link.dataset.id;
+          state.activeMenuSession = null;
+          state.selectMode = false;
+          state.selectedPhotos = [];
+          renderNav();
+          renderGallery();
+        });
+      });
+      navList.querySelectorAll('.session-menu-btn').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const sessionId = button.dataset.id;
+          state.activeMenuSession = state.activeMenuSession === sessionId ? null : sessionId;
+          renderNav();
+        });
+      });
+      navList.querySelectorAll('.edit-session-btn').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const sessionId = button.dataset.id;
+          editSession(sessionId);
+        });
+      });
+      navList.querySelectorAll('.delete-session-btn').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const sessionId = button.dataset.id;
+          deleteSession(sessionId);
+        });
+      });
+    }
+
+    function renderGalleryMenu() {
+      galleryMenuWrapper.classList.toggle('open', state.galleryMenuOpen);
+      toggleSelectBtn.textContent = state.selectMode ? '선택 취소' : '사진 선택';
+      if (state.selectMode) {
+        deleteSelectedBtn.style.display = 'block';
+        deleteSelectedBtn.disabled = state.selectedPhotos.length === 0;
+        deleteSelectedBtn.textContent = `선택 삭제 (${state.selectedPhotos.length}개)`;
+      } else {
+        deleteSelectedBtn.style.display = 'none';
+      }
+    }
+
+    function renderSelectToolbar() {
+      renderGalleryMenu();
+    }
+
+    function toggleSelectMode() {
+      state.selectMode = !state.selectMode;
+      if (!state.selectMode) {
+        state.selectedPhotos = [];
+      }
+      state.galleryMenuOpen = false;
+      renderGallery();
+    }
+
+    function togglePhotoSelection(photoId) {
+      const index = state.selectedPhotos.indexOf(photoId);
+      if (index >= 0) {
+        state.selectedPhotos.splice(index, 1);
+      } else {
+        state.selectedPhotos.push(photoId);
+      }
+      renderGallery();
+    }
+
+    function deleteSelectedPhotos() {
+      if (!state.selectedPhotos.length) return;
+      const password = prompt('선택 삭제를 위해 관리자 비밀번호를 입력하세요:');
+      if (password !== ADMIN_PASSWORD) {
+        alert('비밀번호가 틀렸습니다.');
+        return;
+      }
+      if (!confirm(`선택한 ${state.selectedPhotos.length}개의 사진을 삭제하시겠습니까?`)) return;
+      const session = sessions.find((item) => item.id === state.filter);
+      if (!session) return;
+      session.photos = session.photos.filter((photo) => !state.selectedPhotos.includes(photo.id));
+      state.selectedPhotos = [];
+      state.selectMode = false;
+      state.galleryMenuOpen = false;
+      saveSessions();
+      renderGallery();
+      renderGalleryMenu();
+    }
+
+    function editSession(sessionId) {
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) return;
+      const password = prompt('출사 수정을 위해 관리자 비밀번호를 입력하세요:');
+      if (password !== ADMIN_PASSWORD) {
+        alert('비밀번호가 틀렸습니다.');
+        return;
+      }
+      state.editSessionId = sessionId;
+      openSessionModal('edit', session);
+      state.activeMenuSession = null;
+      renderNav();
+    }
+
+    function deleteSession(sessionId) {
+      const password = prompt('출사 삭제를 위해 관리자 비밀번호를 입력하세요:');
+      if (password !== ADMIN_PASSWORD) {
+        alert('비밀번호가 틀렸습니다.');
+        return;
+      }
+      if (!confirm('정말 삭제하시겠습니까? 이 출사의 모든 사진도 함께 삭제됩니다.')) return;
+      const index = sessions.findIndex((item) => item.id === sessionId);
+      if (index === -1) return;
+      sessions.splice(index, 1);
+      saveSessions();
+      if (state.filter === sessionId) {
+        state.filter = sessions[0]?.id || '';
+      }
+      state.activeMenuSession = null;
+      renderNav();
+      renderGallery();
+    }
+
+    // ===== 갤러리 렌더링 =====
+    function renderGallery() {
+      const photos = getPhotos();
+      photoCount.textContent = `사진 ${photos.length}개`;
+      gallery.innerHTML = photos
+        .map(
+          (photo) => `
+        <article class="photo-card ${state.votedIds.includes(photo.id) ? 'voted' : ''} ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(photo.id) ? 'selected' : ''}" data-id="${photo.id}">
+          <input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(photo.id) ? 'checked' : ''} aria-label="사진 선택" />
+          <img class="photo-img" src="${photo.imageUrl}" alt="${photo.title || ''}" loading="lazy" onerror="this.src='https://via.placeholder.com/900x1200?text=No+Image'" />
+          <div class="overlay">
+            <div class="overlay-content">
+              ${photo.title ? `<span class="photo-title">${photo.title}</span>` : ''}
+              ${photo.author ? `<span class="photo-author">${photo.author}</span>` : ''}
+            </div>
+          </div>
+          <button class="vote-chip${state.votedIds.includes(photo.id) ? ' voted' : ''}" type="button" ${state.selectMode ? 'disabled' : ''}>
+            <span class="heart">♥</span> <span class="vote-num">${getCount(photo)}</span>
+          </button>
+          <div class="heart-burst">♥</div>
+        </article>`
+        )
+        .join('');
+      renderSelectToolbar();
+      // 모달 / 선택 토글: 사진 클릭 시
+      gallery.querySelectorAll('.photo-img').forEach((img) => {
+        img.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = img.closest('.photo-card');
+          const photoId = card.dataset.id;
+          if (state.selectMode) {
+            togglePhotoSelection(photoId);
+          } else {
+            openModal(img.src, img.alt);
+          }
+        });
+      });
+      // 사진 선택 체크박스
+      gallery.querySelectorAll('.select-checkbox').forEach((checkbox) => {
+        checkbox.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = checkbox.closest('.photo-card');
+          togglePhotoSelection(card.dataset.id);
+        });
+      });
+      // 투표 버튼 클릭 (하단 중앙)
+      gallery.querySelectorAll('.photo-card').forEach((card) => {
+        const voteBtn = card.querySelector('.vote-chip');
+        voteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (state.selectMode) return;
+          const photoId = card.dataset.id;
+          const photo = sessions.flatMap((session) => session.photos).find((item) => item.id === photoId);
+          const currentCount = getCount(photo);
+          if (state.votedIds.includes(photoId)) {
+            card.classList.add('unvote-animation');
+            setTimeout(() => { card.classList.remove('unvote-animation'); }, 400);
+            state.votedIds = state.votedIds.filter(id => id !== photoId);
+            state.voteCounts[photoId] = Math.max(0, currentCount - 1);
+          } else {
+            card.classList.add('vote-animation');
+            setTimeout(() => { card.classList.remove('vote-animation'); }, 400);
+            state.votedIds.push(photoId);
+            state.voteCounts[photoId] = currentCount + 1;
+          }
+          saveState();
+          renderGallery();
+        });
+      });
+    }
+
+    // ===== 모달 함수 =====
+    function openModal(imgSrc, imgAlt) {
+      let modal = document.getElementById('photoModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'photoModal';
+        modal.innerHTML = `
+          <div class="modal-backdrop"></div>
+          <div class="modal-content">
+            <button class="modal-close" aria-label="닫기">×</button>
+            <img class="modal-img" src="" alt="" />
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+      const img = modal.querySelector('.modal-img');
+      img.src = imgSrc;
+      img.alt = imgAlt || '';
+      modal.style.display = 'flex';
+      setTimeout(() => { modal.classList.add('active'); }, 10);
+      // 닫기 버튼, 배경, ESC
+      const close = () => {
+        modal.classList.remove('active');
+        setTimeout(() => { modal.style.display = 'none'; }, 200);
+      };
+      modal.querySelector('.modal-close').onclick = close;
+      modal.querySelector('.modal-backdrop').onclick = close;
+      window.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape') {
+          close();
+          window.removeEventListener('keydown', escHandler);
+        }
+      });
+    }
+
+    // ===== 삭제 함수 =====
+    function deletePhoto(photoId) {
+      const password = prompt('사진을 삭제하려면 관리자 비밀번호를 입력하세요:');
+      if (password !== ADMIN_PASSWORD) {
+        alert('비밀번호가 틀렸습니다.');
+        return;
+      }
+      const session = sessions.find((item) => item.id === state.filter);
+      if (!session) return;
+      session.photos = session.photos.filter((p) => p.id !== photoId);
+      saveSessions();
+      renderGallery();
+    }
+
+    // ===== 모달 창 관리 =====
+    function openSessionModal(mode, session = null) {
+      sessionModalTitle.textContent = mode === 'edit' ? '출사 수정' : '출사 추가';
+      saveSessionBtn.textContent = mode === 'edit' ? '저장' : '추가';
+      if (mode === 'edit' && session) {
+        modalSessionLocationInput.value = session.location;
+        modalSessionDateInput.value = session.date;
+      } else {
+        modalSessionLocationInput.value = '';
+        modalSessionDateInput.value = '';
+      }
+      sessionModal.classList.remove('hidden');
+      setTimeout(() => sessionModal.classList.add('active'), 10);
+      modalSessionLocationInput.focus();
+    }
+
+    function closeSessionModal() {
+      sessionModal.classList.add('hidden');
+      sessionModal.classList.remove('active');
+      state.editSessionId = null;
+    }
+
+    function toggleSessionForm() {
+      openSessionModal('add');
+    }
+
+    function addSession(e) {
+      e.preventDefault();
+      const location = modalSessionLocationInput.value.trim();
+      const date = modalSessionDateInput.value.trim();
+      if (!location || !date) return;
+      const number = sessions.length ? Math.max(...sessions.map(s => s.number)) + 1 : 1;
+      const id = `session-${number}`;
+      sessions.push({ id, number, location, date, photos: [] });
+      saveSessions();
+      state.filter = id;
+      closeSessionModal();
+      renderNav();
+      renderGallery();
+    }
+
+    function saveSessionEdit(e) {
+      e.preventDefault();
+      const session = sessions.find((item) => item.id === state.editSessionId);
+      if (!session) return;
+      session.location = modalSessionLocationInput.value.trim() || session.location;
+      session.date = modalSessionDateInput.value.trim() || session.date;
+      saveSessions();
+      closeSessionModal();
+      renderNav();
+      renderGallery();
+    }
+
+    // ===== 이벤트 리스너 등록 =====
+    addSessionBtn.addEventListener('click', toggleSessionForm);
+    sessionModalForm.addEventListener('submit', (e) => {
+      if (state.editSessionId) {
+        saveSessionEdit(e);
+      } else {
+        addSession(e);
+      }
+    });
+    cancelSessionModal.addEventListener('click', closeSessionModal);
+    sessionModal.addEventListener('click', (event) => {
+      if (event.target === sessionModal) {
+        closeSessionModal();
+      }
+    });
+    galleryMenuBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      state.galleryMenuOpen = !state.galleryMenuOpen;
+      renderGalleryMenu();
+    });
+    galleryMenuPopup.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        if (!sessionModal.classList.contains('hidden')) {
+          closeSessionModal();
+        }
+        if (state.activeMenuSession) {
+          state.activeMenuSession = null;
+          renderNav();
+        }
+        if (state.galleryMenuOpen) {
+          state.galleryMenuOpen = false;
+          renderGalleryMenu();
+        }
+      }
+    });
+    document.addEventListener('click', () => {
+      if (state.activeMenuSession) {
+        state.activeMenuSession = null;
+        renderNav();
+      }
+      if (state.galleryMenuOpen) {
+        state.galleryMenuOpen = false;
+        renderGalleryMenu();
+      }
+    });
+    toggleSelectBtn.addEventListener('click', toggleSelectMode);
+    deleteSelectedBtn.addEventListener('click', deleteSelectedPhotos);
+
+    // 드래그앤드롭 업로드
+    galleryWrap.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1) dragOverlay.classList.add('active');
+    });
+    galleryWrap.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) dragOverlay.classList.remove('active');
+    });
+    galleryWrap.addEventListener('dragover', (e) => { e.preventDefault(); });
+    galleryWrap.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dragOverlay.classList.remove('active');
+      const files = e.dataTransfer.files;
+      if (!files.length) return;
+      const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+      if (!imageFiles.length) {
+        alert('이미지 파일만 업로드 가능합니다.');
+        return;
+      }
+      const password = prompt('사진 업로드를 위해 관리자 비밀번호를 입력하세요:');
+      if (password !== ADMIN_PASSWORD) {
+        alert('비밀번호가 틀렸습니다.');
+        return;
+      }
+      const session = sessions.find((item) => item.id === state.filter);
+      if (!session) {
+        alert('출사를 먼저 선택해주세요.');
+        return;
+      }
+      const uploadPromises = imageFiles.map((file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          const newPhoto = {
+            id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            title: '',
+            author: '',
+            imageUrl: loadEvent.target.result,
+            votes: 0,
+          };
+          session.photos.push(newPhoto);
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      }));
+      Promise.all(uploadPromises).then(() => {
+        saveSessions();
+        window.location.reload();
+      });
+    });
+
+    // ===== 초기 렌더링 =====
+    renderNav();
+    renderGallery();
+  </script>
+</body>
+</html>
