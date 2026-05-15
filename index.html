@@ -491,6 +491,13 @@
       });
 
       const votesRef = ref(db, `votes/${userId}`);
+      get(votesRef).then((snapshot) => {
+        const data = snapshot.val();
+        state.votedIds = data ? Object.keys(data) : [];
+        if (Array.isArray(sessions) && sessions.length > 0) {
+          renderGallery();
+        }
+      });
       onValue(votesRef, (snapshot) => {
         const data = snapshot.val();
         state.votedIds = data ? Object.keys(data) : [];
@@ -777,8 +784,11 @@
           // 백그라운드에서 Firebase 저장
           try {
             await handleVote(photoId);
+            await renderGallery();
           } finally {
-            voteBtn.disabled = false;
+            if (voteBtn.isConnected) {
+              voteBtn.disabled = false;
+            }
           }
         });
       });
