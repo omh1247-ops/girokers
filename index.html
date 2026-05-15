@@ -784,7 +784,6 @@
           // 백그라운드에서 Firebase 저장
           try {
             await handleVote(photoId);
-            await renderGallery();
           } finally {
             if (voteBtn.isConnected) {
               voteBtn.disabled = false;
