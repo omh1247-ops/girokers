@@ -491,7 +491,8 @@
       });
 
       const votesRef = ref(db, `votes/${userId}`);
-      onValue(votesRef, (snapshot) => {
+      // 초기 로딩 시에만 투표 데이터 가져오기
+      get(votesRef).then((snapshot) => {
         const data = snapshot.val();
         state.votedIds = data ? Object.keys(data) : [];
         if (Array.isArray(sessions) && sessions.length > 0) {
