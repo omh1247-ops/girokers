@@ -1,5 +1,3 @@
-자주 사용하는 앱에서 바로 AI를 사용해 보세요 … Gemini를 사용하여 초안을 생성하고 콘텐츠를 다듬고, 2개월 동안 ₩29,000 ₩14,500에 Google의 차세대 AI가 지원되는 Gemini Pro를 이용하세요.
-girokers-fixed-complete.html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -420,11 +418,13 @@ girokers-fixed-complete.html
       onValue(sessionsRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
+          // 🔥 배열 확인 추가
           sessions = Array.isArray(data) ? data : Object.values(data);
           if (!state.filter && sessions.length > 0) {
             state.filter = sessions[0].id;
           }
         } else {
+          // 초기 데이터 생성
           sessions = [{
             id: 'session-1',
             number: 1,
@@ -437,38 +437,45 @@ girokers-fixed-complete.html
           set(sessionsRef, sessionsObj);
           state.filter = 'session-1';
         }
+        // 🔥 배열 체크 후 렌더링
         if (Array.isArray(sessions) && sessions.length > 0) {
           renderNav();
           renderGallery();
         }
       });
 
+      // 내가 투표한 사진 불러오기
       const votesRef = ref(db, `votes/${userId}`);
       onValue(votesRef, (snapshot) => {
         const data = snapshot.val();
         state.votedIds = data ? Object.keys(data) : [];
+        // 🔥 배열 체크 후 렌더링
         if (Array.isArray(sessions) && sessions.length > 0) {
           renderGallery();
         }
       });
     }
 
+    // Firebase에 세션 저장
     async function saveSessions() {
       const sessionsRef = ref(db, 'sessions');
       const sessionsObj = sessions.reduce((acc, s) => ({ ...acc, [s.id]: s }), {});
       await set(sessionsRef, sessionsObj);
     }
 
+    // 투표 처리
     async function handleVote(photoId) {
       const voteRef = ref(db, `votes/${userId}/${photoId}`);
       const photoVotesRef = ref(db, `photoVotes/${photoId}`);
       
       if (state.votedIds.includes(photoId)) {
+        // 투표 취소
         await remove(voteRef);
         const snapshot = await get(photoVotesRef);
         const currentCount = snapshot.val() || 0;
         await set(photoVotesRef, Math.max(0, currentCount - 1));
       } else {
+        // 투표
         await set(voteRef, true);
         const snapshot = await get(photoVotesRef);
         const currentCount = snapshot.val() || 0;
@@ -476,18 +483,22 @@ girokers-fixed-complete.html
       }
     }
 
+    // 사진의 투표 수 가져오기
     async function getVoteCount(photoId) {
       const photoVotesRef = ref(db, `photoVotes/${photoId}`);
       const snapshot = await get(photoVotesRef);
       return snapshot.val() || 0;
     }
 
+    // ===== 데이터 접근 함수 =====
     function getPhotos() {
       const session = sessions.find((item) => item.id === state.filter);
       return session && Array.isArray(session.photos) ? session.photos : [];
     }
 
+    // ===== 네비게이션 렌더링 =====
     function renderNav() {
+      // 🔥 배열 체크
       if (!Array.isArray(sessions)) {
         navList.innerHTML = '';
         return;
@@ -633,7 +644,9 @@ girokers-fixed-complete.html
       renderGallery();
     }
 
+    // ===== 갤러리 렌더링 =====
     async function renderGallery() {
+      // 🔥 배열 체크 추가!
       if (!Array.isArray(sessions) || sessions.length === 0) {
         photoCount.textContent = '사진 0개';
         gallery.innerHTML = '';
@@ -650,6 +663,7 @@ girokers-fixed-complete.html
         return;
       }
       
+      // 각 사진의 투표 수 가져오기
       const photosWithVotes = await Promise.all(
         photos.map(async (photo) => {
           const voteCount = await getVoteCount(photo.id);
@@ -673,6 +687,7 @@ girokers-fixed-complete.html
       
       renderGalleryMenu();
       
+      // 사진 클릭 이벤트
       gallery.querySelectorAll('.photo-img').forEach((img) => {
         img.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -686,6 +701,7 @@ girokers-fixed-complete.html
         });
       });
       
+      // 체크박스 클릭
       gallery.querySelectorAll('.select-checkbox').forEach((checkbox) => {
         checkbox.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -694,6 +710,7 @@ girokers-fixed-complete.html
         });
       });
       
+      // 투표 버튼 클릭
       gallery.querySelectorAll('.photo-card').forEach((card) => {
         const voteBtn = card.querySelector('.vote-chip');
         voteBtn.addEventListener('click', async (e) => {
@@ -715,6 +732,7 @@ girokers-fixed-complete.html
       });
     }
 
+    // ===== 모달 함수 =====
     function openModal(imgSrc, imgAlt) {
       let modal = document.getElementById('photoModal');
       if (!modal) {
@@ -749,6 +767,7 @@ girokers-fixed-complete.html
       });
     }
 
+    // ===== 모달 창 관리 =====
     function openSessionModal(mode, session = null) {
       sessionModalTitle.textContent = mode === 'edit' ? '출사 수정' : '출사 추가';
       saveSessionBtn.textContent = mode === 'edit' ? '저장' : '추가';
@@ -798,6 +817,7 @@ girokers-fixed-complete.html
       renderGallery();
     }
 
+    // ===== 이벤트 리스너 등록 =====
     addSessionBtn.addEventListener('click', () => openSessionModal('add'));
     sessionModalForm.addEventListener('submit', (e) => {
       if (state.editSessionId) {
@@ -848,6 +868,7 @@ girokers-fixed-complete.html
     toggleSelectBtn.addEventListener('click', toggleSelectMode);
     deleteSelectedBtn.addEventListener('click', deleteSelectedPhotos);
 
+    // 드래그앤드롭 업로드
     galleryWrap.addEventListener('dragenter', (e) => {
       e.preventDefault();
       dragCounter++;
@@ -881,6 +902,7 @@ girokers-fixed-complete.html
         return;
       }
       
+      // 🔥 photos 배열 초기화 확인
       if (!Array.isArray(session.photos)) {
         session.photos = [];
       }
@@ -908,6 +930,7 @@ girokers-fixed-complete.html
       renderGallery();
     });
 
+    // ===== 초기화 =====
     loadData();
   </script>
 </body>
