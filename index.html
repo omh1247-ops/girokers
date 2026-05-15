@@ -374,7 +374,7 @@
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-    import { getDatabase, ref, set, get, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+    import { getDatabase, ref, set, get, remove, onValue, runTransaction } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyDXhpG3hRcVwZjW6FH560zgjKEX1xS0aG0",
@@ -491,8 +491,7 @@
       });
 
       const votesRef = ref(db, `votes/${userId}`);
-      // 초기 로딩 시에만 투표 데이터 가져오기
-      get(votesRef).then((snapshot) => {
+      onValue(votesRef, (snapshot) => {
         const data = snapshot.val();
         state.votedIds = data ? Object.keys(data) : [];
         if (Array.isArray(sessions) && sessions.length > 0) {
@@ -510,17 +509,23 @@
     async function handleVote(photoId) {
       const voteRef = ref(db, `votes/${userId}/${photoId}`);
       const photoVotesRef = ref(db, `photoVotes/${photoId}`);
-      
-      if (state.votedIds.includes(photoId)) {
+      const userVoteSnapshot = await get(voteRef);
+      const isVoted = userVoteSnapshot.exists();
+
+      if (isVoted) {
         await remove(voteRef);
-        const snapshot = await get(photoVotesRef);
-        const currentCount = snapshot.val() || 0;
-        await set(photoVotesRef, Math.max(0, currentCount - 1));
+        await runTransaction(photoVotesRef, (currentCount) => {
+          return Math.max(0, (currentCount || 0) - 1);
+        });
+        state.votedIds = state.votedIds.filter((id) => id !== photoId);
       } else {
         await set(voteRef, true);
-        const snapshot = await get(photoVotesRef);
-        const currentCount = snapshot.val() || 0;
-        await set(photoVotesRef, currentCount + 1);
+        await runTransaction(photoVotesRef, (currentCount) => {
+          return (currentCount || 0) + 1;
+        });
+        if (!state.votedIds.includes(photoId)) {
+          state.votedIds.push(photoId);
+        }
       }
     }
 
@@ -752,6 +757,7 @@
           
           const photoId = card.dataset.id;
           const currentVotes = parseInt(voteNum.textContent) || 0;
+          voteBtn.disabled = true;
           
           if (state.votedIds.includes(photoId)) {
             // 투표 취소 - 즉시 UI 업데이트
@@ -769,7 +775,11 @@
           }
           
           // 백그라운드에서 Firebase 저장
-          await handleVote(photoId);
+          try {
+            await handleVote(photoId);
+          } finally {
+            voteBtn.disabled = false;
+          }
         });
       });
     }
