@@ -501,9 +501,6 @@
       onValue(votesRef, (snapshot) => {
         const data = snapshot.val();
         state.votedIds = data ? Object.keys(data) : [];
-        if (Array.isArray(sessions) && sessions.length > 0) {
-          renderGallery();
-        }
       });
     }
 
@@ -524,15 +521,11 @@
         await runTransaction(photoVotesRef, (currentCount) => {
           return Math.max(0, (currentCount || 0) - 1);
         });
-        state.votedIds = state.votedIds.filter((id) => id !== photoId);
       } else {
         await set(voteRef, true);
         await runTransaction(photoVotesRef, (currentCount) => {
           return (currentCount || 0) + 1;
         });
-        if (!state.votedIds.includes(photoId)) {
-          state.votedIds.push(photoId);
-        }
       }
     }
 
@@ -764,26 +757,30 @@
           
           const photoId = card.dataset.id;
           const currentVotes = parseInt(voteNum.textContent) || 0;
+          const hasVoted = state.votedIds.includes(photoId);
           voteBtn.disabled = true;
           
-          if (state.votedIds.includes(photoId)) {
+          if (hasVoted) {
             // 투표 취소 - 즉시 UI 업데이트
             card.classList.remove('voted');
             card.classList.add('unvote-animation');
             voteBtn.classList.remove('voted');
             voteNum.textContent = Math.max(0, currentVotes - 1);
+            state.votedIds = state.votedIds.filter((id) => id !== photoId);
             setTimeout(() => { card.classList.remove('unvote-animation'); }, 400);
           } else {
             // 투표 - 즉시 UI 업데이트
             card.classList.add('voted', 'vote-animation');
             voteBtn.classList.add('voted');
             voteNum.textContent = currentVotes + 1;
+            state.votedIds.push(photoId);
             setTimeout(() => { card.classList.remove('vote-animation'); }, 400);
           }
           
-          // 백그라운드에서 Firebase 저장
           try {
             await handleVote(photoId);
+          } catch (error) {
+            console.error('handleVote error', error);
           } finally {
             if (voteBtn.isConnected) {
               voteBtn.disabled = false;
