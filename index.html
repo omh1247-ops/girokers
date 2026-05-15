@@ -799,21 +799,38 @@
       
       gallery.querySelectorAll('.photo-card').forEach((card) => {
         const voteBtn = card.querySelector('.vote-chip');
+        const voteNum = voteBtn.querySelector('.vote-num');
+        const heartBurst = card.querySelector('.heart-burst');
+        
         voteBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           if (state.selectMode) return;
           
           const photoId = card.dataset.id;
+          const currentVotes = parseInt(voteNum.textContent) || 0;
           
           if (state.votedIds.includes(photoId)) {
+            // 투표 취소 - 즉시 UI 업데이트
+            card.classList.remove('voted');
             card.classList.add('unvote-animation');
-            setTimeout(() => { card.classList.remove('unvote-animation'); }, 400);
+            voteBtn.classList.remove('voted');
+            voteNum.textContent = Math.max(0, currentVotes - 1);
+            heartBurst.style.opacity = '0'; // 가운데 하트 즉시 제거
+            setTimeout(() => { 
+              card.classList.remove('unvote-animation');
+            }, 400);
           } else {
-            card.classList.add('vote-animation');
-            setTimeout(() => { card.classList.remove('vote-animation'); }, 400);
+            // 투표 - 즉시 UI 업데이트
+            card.classList.add('voted', 'vote-animation');
+            voteBtn.classList.add('voted');
+            voteNum.textContent = currentVotes + 1;
+            heartBurst.style.opacity = '1'; // 가운데 하트 즉시 표시
+            setTimeout(() => { 
+              card.classList.remove('vote-animation');
+            }, 400);
           }
           
-          // 🔥 즉각 반응!
+          // 백그라운드에서 Firebase 저장
           await handleVote(photoId);
         });
       });
