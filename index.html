@@ -418,7 +418,9 @@
       onValue(sessionsRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          sessions = Object.values(data);
+          // 데이터가 배열인지 객체인지 확인
+          sessions = Array.isArray(data) ? data : Object.values(data);
+          // 빈 배열이 아닌지 확인
           if (!state.filter && sessions.length > 0) {
             state.filter = sessions[0].id;
           }
@@ -434,8 +436,11 @@
           set(sessionsRef, sessions.reduce((acc, s) => ({ ...acc, [s.id]: s }), {}));
           state.filter = 'session-1';
         }
-        renderNav();
-        renderGallery();
+        // sessions가 배열인지 확인
+        if (Array.isArray(sessions) && sessions.length > 0) {
+          renderNav();
+          renderGallery();
+        }
       });
 
       // 내가 투표한 사진 불러오기
@@ -443,7 +448,9 @@
       onValue(votesRef, (snapshot) => {
         const data = snapshot.val();
         state.votedIds = data ? Object.keys(data) : [];
-        renderGallery();
+        if (Array.isArray(sessions) && sessions.length > 0) {
+          renderGallery();
+        }
       });
     }
 
@@ -631,6 +638,13 @@
 
     // ===== 갤러리 렌더링 =====
     async function renderGallery() {
+      // 🔥 이 부분 추가!
+      if (!Array.isArray(sessions) || sessions.length === 0) {
+        photoCount.textContent = '사진 0개';
+        gallery.innerHTML = '';
+        return;
+      }
+      
       const photos = getPhotos();
       photoCount.textContent = `사진 ${photos.length}개`;
       
