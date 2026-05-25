@@ -93,6 +93,17 @@
     .drag-overlay.active { display: flex; }
     .drag-message { color: #333; font-size: 1.5rem; font-weight: 700; text-align: center; padding: 40px; }
     .gallery { column-count: 5; column-gap: 8px; width: auto; }
+    .gallery-featured {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .gallery-grid {
+      column-count: 5;
+      column-gap: 8px;
+      width: auto;
+    }
     .photo-count { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; margin-top: 20px; }
     .photo-card {
       position: relative;
@@ -112,6 +123,17 @@
       transition: transform 0.4s ease;
       object-fit: cover;
       margin-bottom: 12px;
+    }
+    .photo-card.featured-card {
+      width: min(420px, 100%);
+      margin: 0 auto;
+      padding: 12px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      border-radius: 2px;
+    }
+    .photo-card.featured-card img {
+      border: 1px solid #e8e8e8;
     }
     .vote-chip {
       position: absolute;
@@ -144,16 +166,16 @@
     }
     .heart-burst { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.95); font-size: 2.2rem; opacity: 0; transition: opacity 180ms ease; pointer-events: none; z-index: 3; }
     .photo-card.voted .heart-burst { opacity: 1; }
-    @keyframes heartPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes heartPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
     .photo-card.vote-animation .heart-burst { animation: heartPop 0.4s ease; }
     @keyframes heartBreak { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2) rotate(10deg); opacity: 0.5; } 100% { transform: scale(0.5) rotate(-10deg); opacity: 0; } }
     .photo-card.unvote-animation .heart-burst { animation: heartBreak 0.4s ease; }
     @keyframes countPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
     .vote-chip.pulse { animation: countPulse 0.3s ease; }
-    @media (max-width: 1280px) { .gallery { column-count: 4; } }
-    @media (max-width: 1024px) { .gallery { column-count: 3; } }
-    @media (max-width: 768px) { .app-shell { grid-template-columns: 1fr; } .sidebar { position: relative; height: auto; width: 100%; padding: 20px 16px 16px; order: -1; } .gallery-wrap { padding: 16px 12px 24px; } .gallery { column-count: 2; } }
-    @media (max-width: 560px) { .gallery { column-count: 1; } .nav-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; } .nav-link { white-space: nowrap; } }
+    @media (max-width: 1280px) { .gallery-grid { column-count: 4; } }
+    @media (max-width: 1024px) { .gallery-grid { column-count: 3; } }
+    @media (max-width: 768px) { .app-shell { grid-template-columns: 1fr; } .sidebar { position: relative; height: auto; width: 100%; padding: 20px 16px 16px; order: -1; } .gallery-wrap { padding: 16px 12px 24px; } .gallery-grid { column-count: 2; } }
+    @media (max-width: 560px) { .gallery-grid { column-count: 1; } .nav-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; } .nav-link { white-space: nowrap; } }
     #photoModal { display: none; position: fixed; z-index: 9999; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.9); transition: opacity 0.2s; }
     #photoModal.active { display: flex; opacity: 1; }
     #photoModal .modal-backdrop { position: absolute; inset: 0; background: transparent; cursor: pointer; }
@@ -351,7 +373,8 @@
           </div>
         </div>
       </div>
-      <div class="gallery" id="gallery"></div>
+      <div class="gallery-featured" id="galleryFeatured"></div>
+      <div class="gallery-grid" id="galleryGrid"></div>
     </main>
   </div>
   <div class="modal-overlay hidden" id="sessionModal">
@@ -430,6 +453,8 @@
 
     const ADMIN_PASSWORD = 'audgns12';
     const gallery = document.getElementById('gallery');
+    const galleryFeatured = document.getElementById('galleryFeatured');
+    const galleryGrid = document.getElementById('galleryGrid');
     const galleryWrap = document.getElementById('galleryWrap');
     const dragOverlay = document.getElementById('dragOverlay');
     const photoCount = document.getElementById('photoCount');
@@ -447,6 +472,7 @@
     const galleryMenuPopup = document.getElementById('galleryMenuPopup');
     const toggleSelectBtn = document.getElementById('toggleSelectBtn');
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const brandTitle = document.querySelector('.brand h1');
     const uploadProgress = document.getElementById('uploadProgress');
     const uploadMessage = document.getElementById('uploadMessage');
     let dragCounter = 0;
@@ -467,9 +493,10 @@
       onValue(sessionsRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          sessions = Array.isArray(data) ? data : Object.values(data);
+          sessions = Array.isArray(data) ? data.filter(Boolean) : Object.values(data);
+          sessions.sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0));
           if (!state.filter && sessions.length > 0) {
-            state.filter = sessions[0].id;
+            state.filter = sessions[sessions.length - 1].id;
           }
         } else {
           sessions = [{
@@ -497,10 +524,6 @@
         if (Array.isArray(sessions) && sessions.length > 0) {
           renderGallery();
         }
-      });
-      onValue(votesRef, (snapshot) => {
-        const data = snapshot.val();
-        state.votedIds = data ? Object.keys(data) : [];
       });
     }
 
@@ -535,9 +558,140 @@
       return snapshot.val() || 0;
     }
 
+    // 이미지 분석: 평균 밝기와 주 색상 추출
+    async function analyzeImage(imageUrl) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const w = Math.min(200, img.width);
+          const h = Math.min(200, img.height);
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          try {
+            const data = ctx.getImageData(0, 0, w, h).data;
+            let r = 0, g = 0, b = 0, count = 0;
+            const bucket = {};
+            // 샘플링: 모든 픽셀을 읽되 한 픽씩 건너뛰어 빠르게 처리
+            for (let i = 0; i < data.length; i += 16) {
+              const rr = data[i];
+              const gg = data[i + 1];
+              const bb = data[i + 2];
+              r += rr; g += gg; b += bb; count++;
+              // 간단한 버킷화 (16단계)
+              const key = `${Math.round(rr/16)*16},${Math.round(gg/16)*16},${Math.round(bb/16)*16}`;
+              bucket[key] = (bucket[key] || 0) + 1;
+            }
+            const avgR = Math.round(r / count);
+            const avgG = Math.round(g / count);
+            const avgB = Math.round(b / count);
+            const luminance = Math.round(0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
+            // dominant bucket 찾기
+            let dominantKey = null; let dominantCount = 0;
+            Object.keys(bucket).forEach(k => {
+              if (bucket[k] > dominantCount) { dominantCount = bucket[k]; dominantKey = k; }
+            });
+            const dominantParts = dominantKey ? dominantKey.split(',').map(n => parseInt(n,10)) : [avgR, avgG, avgB];
+            const dominant = { r: dominantParts[0], g: dominantParts[1], b: dominantParts[2] };
+
+            // 색 이론 간단 적용
+            let frameColor = '#f5f5f5';
+            // 밝은 사진이면 어두운 액자, 어두운 사진이면 밝은 액자
+            if (luminance > 150) {
+              frameColor = '#2a2a2a';
+            } else {
+              frameColor = '#f5f5f5';
+            }
+            // 따뜻한 톤이면 차가운 계열로 조정
+            const isWarm = dominant.r > dominant.g && dominant.r > dominant.b;
+            if (isWarm) {
+              frameColor = luminance > 150 ? '#1f3b6f' : '#eaf3ff';
+            }
+
+            const borderColor = (luminance > 150 || frameColor === '#1f3b6f') ? 'rgba(255,255,255,0.12)' : '#e8e8e8';
+
+            resolve({ avg: { r: avgR, g: avgG, b: avgB }, luminance, dominant, frameColor, borderColor });
+          } catch (err) {
+            // 보안 제약 등으로 실패하면 기본값 반환
+            resolve({ avg: { r: 240, g: 240, b: 240 }, luminance: 240, dominant: { r: 240, g: 240, b: 240 }, frameColor: '#f5f5f5', borderColor: '#e8e8e8' });
+          }
+        };
+        img.onerror = () => {
+          resolve({ avg: { r: 240, g: 240, b: 240 }, luminance: 240, dominant: { r: 240, g: 240, b: 240 }, frameColor: '#f5f5f5', borderColor: '#e8e8e8' });
+        };
+        img.src = imageUrl;
+      });
+    }
+
     function getPhotos() {
       const session = sessions.find((item) => item.id === state.filter);
       return session && Array.isArray(session.photos) ? session.photos : [];
+    }
+
+    function setupPhotoCardInteractions(container) {
+      if (!container) return;
+      container.querySelectorAll('.photo-img').forEach((img) => {
+        img.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = img.closest('.photo-card');
+          const photoId = card.dataset.id;
+          if (state.selectMode) {
+            togglePhotoSelection(photoId);
+          } else {
+            openModal(img.src, img.alt);
+          }
+        });
+      });
+
+      container.querySelectorAll('.select-checkbox').forEach((checkbox) => {
+        checkbox.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = checkbox.closest('.photo-card');
+          togglePhotoSelection(card.dataset.id);
+        });
+      });
+
+      container.querySelectorAll('.photo-card').forEach((card) => {
+        const voteBtn = card.querySelector('.vote-chip');
+        const voteNum = voteBtn && voteBtn.querySelector('.vote-num');
+        if (!voteBtn || !voteNum) return;
+
+        voteBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (state.selectMode) return;
+
+          const photoId = card.dataset.id;
+          const currentVotes = parseInt(voteNum.textContent) || 0;
+          const hasVoted = state.votedIds.includes(photoId);
+          voteBtn.disabled = true;
+
+          // 즉시 UI 업데이트
+          if (hasVoted) {
+            state.votedIds = state.votedIds.filter((id) => id !== photoId);
+            voteNum.textContent = Math.max(0, currentVotes - 1);
+            card.classList.remove('voted');
+            card.classList.add('unvote-animation');
+            voteBtn.classList.remove('voted');
+            setTimeout(() => { card.classList.remove('unvote-animation'); }, 400);
+          } else {
+            state.votedIds.push(photoId);
+            voteNum.textContent = currentVotes + 1;
+            card.classList.add('voted', 'vote-animation');
+            voteBtn.classList.add('voted');
+            setTimeout(() => { card.classList.remove('vote-animation'); }, 400);
+          }
+
+          // 백그라운드에서 Firebase 저장
+          handleVote(photoId).catch(error => {
+            console.error('handleVote error', error);
+          });
+
+          voteBtn.disabled = false;
+        });
+      });
     }
 
     function renderNav() {
@@ -689,7 +843,8 @@
     async function renderGallery() {
       if (!Array.isArray(sessions) || sessions.length === 0) {
         photoCount.textContent = '사진 0개';
-        gallery.innerHTML = '';
+        galleryFeatured.innerHTML = '';
+        galleryGrid.innerHTML = '';
         renderGalleryMenu();
         return;
       }
@@ -698,7 +853,8 @@
       photoCount.textContent = `사진 ${photos.length}개`;
       
       if (photos.length === 0) {
-        gallery.innerHTML = '';
+        galleryFeatured.innerHTML = '';
+        galleryGrid.innerHTML = '';
         renderGalleryMenu();
         return;
       }
@@ -710,7 +866,30 @@
         })
       );
       
-      gallery.innerHTML = photosWithVotes
+      // votes 순으로 정렬 (내림차순)
+      photosWithVotes.sort((a, b) => b.votes - a.votes);
+      
+      // 첫 번째 사진(votes > 0)을 featured로 처리
+      const featuredPhoto = photosWithVotes[0]?.votes > 0 ? photosWithVotes[0] : null;
+      const regularPhotos = featuredPhoto ? photosWithVotes.slice(1) : photosWithVotes;
+      
+      // Featured 사진 렌더링 (투표 버튼 없음 - 미리보기만)
+      if (featuredPhoto) {
+        // 이미지 분석을 통해 액자 색상 결정
+        const analysis = await analyzeImage(featuredPhoto.imageUrl);
+        const frameColor = analysis.frameColor || '#f5f5f5';
+        const borderColor = analysis.borderColor || '#e8e8e8';
+        galleryFeatured.innerHTML = `
+        <article class="photo-card featured-card ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(featuredPhoto.id) ? 'selected' : ''}" data-id="${featuredPhoto.id}" style="background:${frameColor};">
+          <input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(featuredPhoto.id) ? 'checked' : ''} aria-label="사진 선택" />
+          <img class="photo-img" src="${featuredPhoto.imageUrl}" alt="${featuredPhoto.title || ''}" loading="lazy" onerror="this.src='https://via.placeholder.com/900x1200?text=No+Image'" style="border:1px solid ${borderColor};" />
+        </article>`;
+      } else {
+        galleryFeatured.innerHTML = '';
+      }
+      
+      // 모든 사진들을 그리드에 렌더링 (1등 포함, 투표 버튼 포함)
+      galleryGrid.innerHTML = photosWithVotes
         .map(
           (photo) => `
         <article class="photo-card ${state.votedIds.includes(photo.id) ? 'voted' : ''} ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(photo.id) ? 'selected' : ''}" data-id="${photo.id}">
@@ -726,68 +905,8 @@
       
       renderGalleryMenu();
       
-      gallery.querySelectorAll('.photo-img').forEach((img) => {
-        img.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const card = img.closest('.photo-card');
-          const photoId = card.dataset.id;
-          if (state.selectMode) {
-            togglePhotoSelection(photoId);
-          } else {
-            openModal(img.src, img.alt);
-          }
-        });
-      });
-      
-      gallery.querySelectorAll('.select-checkbox').forEach((checkbox) => {
-        checkbox.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const card = checkbox.closest('.photo-card');
-          togglePhotoSelection(card.dataset.id);
-        });
-      });
-      
-      gallery.querySelectorAll('.photo-card').forEach((card) => {
-        const voteBtn = card.querySelector('.vote-chip');
-        const voteNum = voteBtn.querySelector('.vote-num');
-        
-        voteBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          if (state.selectMode) return;
-          
-          const photoId = card.dataset.id;
-          const currentVotes = parseInt(voteNum.textContent) || 0;
-          const hasVoted = state.votedIds.includes(photoId);
-          voteBtn.disabled = true;
-          
-          if (hasVoted) {
-            // 투표 취소 - 즉시 UI 업데이트
-            card.classList.remove('voted');
-            card.classList.add('unvote-animation');
-            voteBtn.classList.remove('voted');
-            voteNum.textContent = Math.max(0, currentVotes - 1);
-            state.votedIds = state.votedIds.filter((id) => id !== photoId);
-            setTimeout(() => { card.classList.remove('unvote-animation'); }, 400);
-          } else {
-            // 투표 - 즉시 UI 업데이트
-            card.classList.add('voted', 'vote-animation');
-            voteBtn.classList.add('voted');
-            voteNum.textContent = currentVotes + 1;
-            state.votedIds.push(photoId);
-            setTimeout(() => { card.classList.remove('vote-animation'); }, 400);
-          }
-          
-          try {
-            await handleVote(photoId);
-          } catch (error) {
-            console.error('handleVote error', error);
-          } finally {
-            if (voteBtn.isConnected) {
-              voteBtn.disabled = false;
-            }
-          }
-        });
-      });
+      setupPhotoCardInteractions(galleryFeatured);
+      setupPhotoCardInteractions(galleryGrid);
     }
 
     function openModal(imgSrc, imgAlt) {
@@ -922,6 +1041,9 @@
     });
     toggleSelectBtn.addEventListener('click', toggleSelectMode);
     deleteSelectedBtn.addEventListener('click', deleteSelectedPhotos);
+    brandTitle.addEventListener('click', () => {
+      window.location.reload();
+    });
 
     galleryWrap.addEventListener('dragenter', (e) => {
       e.preventDefault();
