@@ -92,7 +92,7 @@
     .drag-overlay { position: absolute; inset: 24px; background: rgba(240, 240, 240, 0.95); border: 3px dashed #999; border-radius: 20px; display: none; align-items: center; justify-content: center; z-index: 100; pointer-events: none; }
     .drag-overlay.active { display: flex; }
     .drag-message { color: #333; font-size: 1.5rem; font-weight: 700; text-align: center; padding: 40px; }
-    .gallery { column-count: 5; column-gap: 8px; width: auto; }
+    .gallery { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: auto; }
     .gallery-featured {
       width: 100%;
       display: flex;
@@ -100,17 +100,17 @@
       margin-bottom: 20px;
     }
     .gallery-grid {
-      column-count: 5;
-      column-gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
       width: auto;
     }
     .photo-count { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; margin-top: 20px; }
     .photo-card {
       position: relative;
-      display: inline-block;
+      display: block;
       width: 100%;
-      margin: 0 0 20px;
-      break-inside: avoid;
+      margin: 0 0 0 0;
       cursor: pointer;
       overflow: visible;
       border-radius: 8px;
@@ -172,10 +172,10 @@
     .photo-card.unvote-animation .heart-burst { animation: heartBreak 0.4s ease; }
     @keyframes countPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
     .vote-chip.pulse { animation: countPulse 0.3s ease; }
-    @media (max-width: 1280px) { .gallery-grid { column-count: 4; } }
-    @media (max-width: 1024px) { .gallery-grid { column-count: 3; } }
-    @media (max-width: 768px) { .app-shell { grid-template-columns: 1fr; } .sidebar { position: relative; height: auto; width: 100%; padding: 20px 16px 16px; order: -1; } .gallery-wrap { padding: 16px 12px 24px; } .gallery-grid { column-count: 2; } }
-    @media (max-width: 560px) { .gallery-grid { column-count: 1; } .nav-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; } .nav-link { white-space: nowrap; } }
+    @media (max-width: 1280px) { .gallery-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 1024px) { .gallery-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 768px) { .app-shell { grid-template-columns: 1fr; } .sidebar { position: relative; height: auto; width: 100%; padding: 20px 16px 16px; order: -1; } .gallery-wrap { padding: 16px 12px 24px; } .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .gallery-grid { grid-template-columns: repeat(1, 1fr); } .nav-list { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; } .nav-link { white-space: nowrap; } }
     #photoModal { display: none; position: fixed; z-index: 9999; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.9); transition: opacity 0.2s; }
     #photoModal.active { display: flex; opacity: 1; }
     #photoModal .modal-backdrop { position: absolute; inset: 0; background: transparent; cursor: pointer; }
@@ -276,6 +276,23 @@
       background: rgba(25, 118, 210, 0.13);
       pointer-events: none;
       border-radius: 8px;
+    }
+    .photo-card.rank-badge::before {
+      content: attr(data-rank);
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
+      background: #e53935;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
     }
     .vote-chip:disabled {
       opacity: 0.5;
@@ -932,21 +949,28 @@
       // 첫 번째 사진(votes > 0)을 featured로 처리
       const featuredPhoto = photosWithVotes[0]?.votes > 0 ? photosWithVotes[0] : null;
       
-      // 그리드 순서는 세션별로 한 번만 랜덤 생성하고 유지
-      const photoIds = photosWithVotes.map((photo) => photo.id);
-      const needsNewOrder =
-        state.photoOrderSession !== state.filter ||
-        state.photoOrder.length !== photoIds.length ||
-        photoIds.some((id) => !state.photoOrder.includes(id));
+      // 그리드 사진 목록 결정
+      // 관리자 모드: 투표수 내림차순으로 정렬
+      // 일반 모드: 세션별로 한 번 랜덤 생성한 순서를 유지
+      let gridPhotos;
+      if (state.adminMode) {
+        gridPhotos = photosWithVotes.slice().sort((a, b) => b.votes - a.votes);
+      } else {
+        const photoIds = photosWithVotes.map((photo) => photo.id);
+        const needsNewOrder =
+          state.photoOrderSession !== state.filter ||
+          state.photoOrder.length !== photoIds.length ||
+          photoIds.some((id) => !state.photoOrder.includes(id));
 
-      if (needsNewOrder) {
-        state.photoOrderSession = state.filter;
-        state.photoOrder = shuffle(photoIds);
+        if (needsNewOrder) {
+          state.photoOrderSession = state.filter;
+          state.photoOrder = shuffle(photoIds);
+        }
+
+        gridPhotos = state.photoOrder
+          .map((id) => photosWithVotes.find((photo) => photo.id === id))
+          .filter(Boolean);
       }
-
-      const shuffledPhotos = state.photoOrder
-        .map((id) => photosWithVotes.find((photo) => photo.id === id))
-        .filter(Boolean);
       
       // Featured 사진 렌더링 (투표 버튼 없음 - 미리보기만)
       if (featuredPhoto) {
@@ -963,18 +987,22 @@
         galleryFeatured.innerHTML = '';
       }
       
-      // 모든 사진들을 그리드에 렌더링 (1등 제외, 투표 버튼 포함)
-      galleryGrid.innerHTML = shuffledPhotos
+      // 모든 사진들을 그리드에 렌더링 (투표 버튼 포함)
+      galleryGrid.innerHTML = gridPhotos
         .map(
-          (photo) => `
-        <article class="photo-card ${state.votedIds.includes(photo.id) ? 'voted' : ''} ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(photo.id) ? 'selected' : ''}" data-id="${photo.id}">
+          (photo, index) => {
+            const rankClass = state.adminMode && index < 5 ? 'rank-badge' : '';
+            const rankAttr = state.adminMode && index < 5 ? `data-rank="${index + 1}"` : '';
+            return `
+        <article class="photo-card ${rankClass} ${state.votedIds.includes(photo.id) ? 'voted' : ''} ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(photo.id) ? 'selected' : ''}" ${rankAttr} data-id="${photo.id}">
           <input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(photo.id) ? 'checked' : ''} aria-label="사진 선택" />
           <img class="photo-img" src="${photo.imageUrl}" alt="${photo.title || ''}" loading="lazy" onerror="this.src='https://via.placeholder.com/900x1200?text=No+Image'" />
           <button class="vote-chip${state.votedIds.includes(photo.id) ? ' voted' : ''}" type="button" ${state.selectMode ? 'disabled' : ''}>
             <span class="heart">♥</span> <span class="vote-num">${photo.votes}</span>
           </button>
           <div class="heart-burst">♥</div>
-        </article>`
+        </article>`;
+          }
         )
         .join('');
       
