@@ -699,14 +699,14 @@
       container.querySelectorAll('.photo-card').forEach((card) => {
         const voteBtn = card.querySelector('.vote-chip');
         const voteNum = voteBtn && voteBtn.querySelector('.vote-num');
-        if (!voteBtn || !voteNum) return;
+        if (!voteBtn) return;
 
         voteBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (state.selectMode) return;
+          if (state.selectMode || state.adminMode) return;
 
           const photoId = card.dataset.id;
-          const currentVotes = parseInt(voteNum.textContent) || 0;
+          const currentVotes = voteNum ? parseInt(voteNum.textContent) || 0 : 0;
           const hasVoted = state.votedIds.includes(photoId);
           voteBtn.disabled = true;
           state.voteUpdating = true;
@@ -714,14 +714,14 @@
           // 즉시 UI 업데이트
           if (hasVoted) {
             state.votedIds = state.votedIds.filter((id) => id !== photoId);
-            voteNum.textContent = Math.max(0, currentVotes - 1);
+            if (voteNum) voteNum.textContent = Math.max(0, currentVotes - 1);
             card.classList.remove('voted');
             card.classList.add('unvote-animation');
             voteBtn.classList.remove('voted');
             setTimeout(() => { card.classList.remove('unvote-animation'); }, 400);
           } else {
             state.votedIds.push(photoId);
-            voteNum.textContent = currentVotes + 1;
+            if (voteNum) voteNum.textContent = currentVotes + 1;
             card.classList.add('voted', 'vote-animation');
             voteBtn.classList.add('voted');
             setTimeout(() => { card.classList.remove('vote-animation'); }, 400);
@@ -802,7 +802,8 @@
     }
 
     function renderGalleryMenu() {
-      galleryMenuWrapper.classList.toggle('open', state.galleryMenuOpen);
+      galleryMenuWrapper.style.display = state.adminMode ? 'block' : 'none';
+      galleryMenuWrapper.classList.toggle('open', state.galleryMenuOpen && state.adminMode);
       toggleSelectBtn.textContent = state.selectMode ? '선택 취소' : '사진 선택';
       if (state.selectMode) {
         deleteSelectedBtn.style.display = 'block';
@@ -829,6 +830,7 @@
     }
 
     function toggleSelectMode() {
+      if (!state.adminMode) return;
       state.selectMode = !state.selectMode;
       if (!state.selectMode) {
         state.selectedPhotos = [];
@@ -928,6 +930,11 @@
       }
       photoCount.textContent = headerText;
       adminDisableBtn.style.display = state.adminMode ? 'block' : 'none';
+      if (!state.adminMode) {
+        state.selectMode = false;
+        state.selectedPhotos = [];
+        state.galleryMenuOpen = false;
+      }
       
       if (photos.length === 0) {
         galleryFeatured.innerHTML = '';
@@ -979,8 +986,8 @@
         const frameColor = analysis.frameColor || '#f5f5f5';
         const borderColor = analysis.borderColor || '#e8e8e8';
         galleryFeatured.innerHTML = `
-        <article class="photo-card featured-card ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(featuredPhoto.id) ? 'selected' : ''}" data-id="${featuredPhoto.id}" style="background:${frameColor};">
-          <input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(featuredPhoto.id) ? 'checked' : ''} aria-label="사진 선택" />
+        <article class="photo-card featured-card ${state.adminMode && state.selectMode ? 'select-mode' : ''} ${state.adminMode && state.selectedPhotos.includes(featuredPhoto.id) ? 'selected' : ''}" data-id="${featuredPhoto.id}" style="background:${frameColor};">
+          ${state.adminMode ? `<input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(featuredPhoto.id) ? 'checked' : ''} aria-label="사진 선택" />` : ''}
           <img class="photo-img" src="${featuredPhoto.imageUrl}" alt="${featuredPhoto.title || ''}" loading="lazy" onerror="this.src='https://via.placeholder.com/900x1200?text=No+Image'" style="border:1px solid ${borderColor};" />
         </article>`;
       } else {
@@ -994,11 +1001,11 @@
             const rankClass = state.adminMode && index < 6 ? 'rank-badge' : '';
             const rankAttr = state.adminMode && index < 6 ? `data-rank="${index + 1}"` : '';
             return `
-        <article class="photo-card ${rankClass} ${state.votedIds.includes(photo.id) ? 'voted' : ''} ${state.selectMode ? 'select-mode' : ''} ${state.selectedPhotos.includes(photo.id) ? 'selected' : ''}" ${rankAttr} data-id="${photo.id}">
-          <input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(photo.id) ? 'checked' : ''} aria-label="사진 선택" />
+        <article class="photo-card ${rankClass} ${state.votedIds.includes(photo.id) ? 'voted' : ''} ${state.adminMode && state.selectMode ? 'select-mode' : ''} ${state.adminMode && state.selectedPhotos.includes(photo.id) ? 'selected' : ''}" ${rankAttr} data-id="${photo.id}">
+          ${state.adminMode ? `<input class="select-checkbox" type="checkbox" ${state.selectedPhotos.includes(photo.id) ? 'checked' : ''} aria-label="사진 선택" />` : ''}
           <img class="photo-img" src="${photo.imageUrl}" alt="${photo.title || ''}" loading="lazy" onerror="this.src='https://via.placeholder.com/900x1200?text=No+Image'" />
-          <button class="vote-chip${state.votedIds.includes(photo.id) ? ' voted' : ''}" type="button" ${state.selectMode ? 'disabled' : ''}>
-            <span class="heart">♥</span> <span class="vote-num">${photo.votes}</span>
+          <button class="vote-chip${state.votedIds.includes(photo.id) ? ' voted' : ''}" type="button" ${state.selectMode ? 'disabled' : ''} title="${state.votedIds.includes(photo.id) ? '추천됨' : '추천하기'}">
+            <span class="heart">♥</span> ${state.adminMode ? `<span class="vote-num">${photo.votes}</span>` : ''}
           </button>
           <div class="heart-burst">♥</div>
         </article>`;
